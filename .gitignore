@@ -1,0 +1,29 @@
+# interná dokumentácia (viď globálne pravidlá)
+SPEC.md
+CURRENT.md
+
+# interné podklady
+zdroje/
+
+# tajomstvá
+.env
+.env.*
+!.env.example
+
+# lokálne povolenia Claude Code
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+.vscode/
+.idea/
+
+# Node a balík rozšírenia
+node_modules/
+out/
+dist/
+tsconfig.tsbuildinfo
+*.vsix

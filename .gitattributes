@@ -1,0 +1,3 @@
+* text=auto
+# Shell skripty bežia na Linuxe — CRLF z Windows by dal "bad interpreter".
+*.sh text eol=lf
