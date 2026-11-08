@@ -1,0 +1,47 @@
+{
+  "name": "sedenia",
+  "displayName": "Sedenia",
+  "description": "Prehľad sedení Claude Code a Codexu s prepínaním okien a chatov.",
+  "version": "0.1.0",
+  "publisher": "saman1001",
+  "private": true,
+  "license": "UNLICENSED",
+  "repository": { "type": "git", "url": "https://github.com/saman1001/sedenia-vscode.git" },
+  "engines": { "vscode": "^1.100.0" },
+  "categories": ["Other"],
+  "extensionKind": ["ui"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/src/extension.js",
+  "files": ["out/src/**", "media/**", "README.md"],
+  "capabilities": { "untrustedWorkspaces": { "supported": true }, "virtualWorkspaces": false },
+  "contributes": {
+    "viewsContainers": { "activitybar": [{ "id": "sedenia", "title": "Sedenia", "icon": "media/sedenia.svg" }] },
+    "views": { "sedenia": [{ "id": "sedenia.sessions", "name": "Sedenia" }] },
+    "commands": [
+      { "command": "sedenia.refresh", "title": "Obnoviť sedenia", "category": "Sedenia", "icon": "$(refresh)" },
+      { "command": "sedenia.open", "title": "Otvoriť sedenie", "category": "Sedenia" },
+      { "command": "sedenia.showOutput", "title": "Zobraziť diagnostiku", "category": "Sedenia", "icon": "$(output)" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "sedenia.refresh", "when": "view == sedenia.sessions", "group": "navigation" },
+        { "command": "sedenia.showOutput", "when": "view == sedenia.sessions" }
+      ],
+      "commandPalette": [{ "command": "sedenia.open", "when": "false" }]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "test": "npm run build && node --test out/test/*.test.js",
+    "test:vscode": "npm run build && node test/run-vscode.cjs",
+    "vscode:prepublish": "npm run build",
+    "package": "vsce package --no-dependencies --allow-missing-repository --skip-license"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "1.100.0",
+    "@vscode/vsce": "^3.6.0",
+    "typescript": "^5.9.3"
+  }
+}
