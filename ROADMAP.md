@@ -1,65 +1,72 @@
-# Roadmapa
+# Roadmap
 
-Checklist funkcií projektu — čo je hotové a čo čaká. Bez dátumov (históriu drží git). Súbor je verejný — žiadne interné dohody. Detail rozpracovaných vecí je v CURRENT.md, zadanie v SPEC.md.
+Implemented features and possible next steps. Each item represents one capability.
 
-## Overenie pred kódom
+## Navigation validation
 
-- [x] Prepnutie okna cez `vscode.openFolder` aktivuje existujúce okno s priečinkom a nenahradí aktuálne
-- [x] Prepnutie cez API VS Code bez shellu, záložný CLI netreba
-- [x] Odznak na ikone v Activity Bar a farebné ikony stavu vo VS Code 1.145
+- [x] Activate an existing workspace window with `vscode.openFolder` without replacing the current workspace
+- [x] Use the VS Code API without passing workspace paths through a shell
+- [x] Verify the Activity Bar badge and themed status icons in VS Code 1.145
 
-## Zoznam sedení Claude Code
+## Claude Code sessions
 
-- [x] Čítanie registra `~/.claude/sessions` (len `interactive` a `bg`)
-- [x] Filter živých procesov cez tasklist s cache
-- [x] Stavy čaká, beží, nečinné a dôvod čakania
-- [x] Text riadku s trvaním a poradie podľa stavu
+- [x] Read `~/.claude/sessions` for interactive and background sessions
+- [x] Filter live processes using a cached Windows process list
+- [x] Show waiting, working and idle states with a waiting reason
+- [x] Display elapsed time and sort by state
 
-## Vlákna Codexu
+## Codex chats
 
-- [x] Čítanie rollout JSONL bez obmedzenia dátumom založenia, s cache podľa veľkosti a času zmeny
-- [x] Rastúci log sa sleduje aj pri nemennom čase úpravy, vek aktivity určujú udalosti
-- [x] Čakanie na schválenie z markerov hooku
-- [x] Čakanie na otázku z JSONL
-- [x] Sloty na priečinok a pre desktopovú appku
-- [x] Veľké súbory bez Pythonu (začiatok a koniec súboru)
+- [x] Read rollout JSONL across creation dates with size and modification-time caching
+- [x] Track growing logs even when modification time remains unchanged, using events for activity age
+- [x] Detect approval requests from optional hook markers
+- [x] Detect questions and replies in both legacy and current JSONL message formats
+- [x] Limit idle chat rows per workspace and for the desktop app
+- [x] Read large logs using Node.js and bounded head/tail reads
 
-## Zobrazenie
+## Sidebar
 
-- [x] Ikona v Activity Bar a zoznam v ľavom paneli
-- [x] Ikony a farby stavu, trvanie v popise, cesta v tooltipe
-- [x] Statická modrá bodka pre bežiace sedenie, žltý zvonček pre čakanie
-- [x] Hlavička s počtami a časom posledného čítania
-- [x] Odznak s počtom čakajúcich
-- [x] Značka sedení aktuálneho okna
-- [x] Správy pre chýbajúci register a neznámy formát
+- [x] Provide an Activity Bar icon and a sidebar session list
+- [x] Show themed status icons, elapsed time and folder tooltips
+- [x] Use a static blue dot for work and a yellow bell for waiting
+- [x] Display state totals and the last refresh time
+- [x] Show a badge with the number of waiting sessions
+- [x] Mark sessions belonging to the current window
+- [x] Report unavailable registries and unreadable records
 
-## Akcie
+## Actions
 
-- [x] Klik na riadok prepne do okna sedenia
-- [x] Hlásenie pri zlyhanom prepnutí
-- [x] Otvorenie konkrétneho chatu natívnej appky Codexu
+- [x] Activate the workspace window when a session row is clicked
+- [x] Report navigation failures
+- [x] Open a specific Codex desktop chat
 
-## Upozornenia
+## Notifications
 
-- [x] Upozornenie pri prechode do čakania (Claude aj Codex)
-- [x] Upozornenie pri dokončení ťahu Codexu
-- [x] Bez upozornenia za sedenia vlastného okna
+- [x] Notify when Claude or Codex starts waiting
+- [x] Notify when a Codex turn finishes
+- [x] Suppress notifications for sessions belonging to the current window
 
-## Kvalita a balenie
+## Tests and packaging
 
-- [x] Testy čistých funkcií prenesené z modu
-- [x] Výstupný kanál s chybami čítania
-- [x] Balík `.vsix` a lokálna inštalácia
+- [x] Port the original pure-function tests
+- [x] Provide an Output channel for diagnostics
+- [x] Build a VSIX package for local installation
 
-## Prechod z modu
+## Migration from the original Claude Code mod
 
-- [x] Prenos logiky overený testami a živým čítaním Claude aj Codexu
-- [x] Používateľ potvrdil vzhľad a správanie panela v bežnom okne
-- [x] Mod vypnutý a zálohovaný
+- [x] Validate behavior using automated tests and live Claude/Codex sessions
+- [x] Validate the sidebar in a regular workspace window
+- [x] Replace the original mod after preserving a local backup
 
-## Neskôr
+## Public distribution
 
-- [ ] Jedno čítanie pre všetky okná namiesto čítania v každom okne
-- [ ] Inkrementálne čítanie JSONL od posledného miesta
-- [ ] Lokálny HTML panel mimo VS Code, ktorý sleduje všetky sedenia a agentov naraz — len sledovanie, riadenie ostáva vo VS Code (nápad, nerozhodnuté)
+- [x] English documentation and repository metadata
+- [x] MIT license
+- [x] Portable optional Codex approval hook and setup guide
+- [x] Validate a clean checkout, including the VS Code smoke test
+
+## Possible next steps
+
+- [ ] Share one reader across VS Code windows
+- [ ] Read appended JSONL incrementally
+- [ ] Explore a standalone local status panel using the same session model

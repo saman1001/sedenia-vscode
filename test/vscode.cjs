@@ -1,15 +1,18 @@
-// Spúšťa VS Code cez --extensionTestsPath. Číta živé zdroje, nemení ich.
+// Runs through --extensionTestsPath. Reads live session data without changing it.
 const vscode = require('vscode');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const root = path.dirname(__dirname);
-const reportPath = process.env.SEDENIA_SMOKE_REPORT || path.join(root, 'zdroje/overenie-2026-11-08/extension-smoke.json');
+const reportPath = process.env.SEDENIA_SMOKE_REPORT || path.join(root, 'test-results/extension-smoke.json');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 exports.run = async function () {
   const report = { at: new Date().toISOString(), vscode: vscode.version, checks: [] };
-  const save = () => fs.writeFile(reportPath, JSON.stringify(report, null, 2) + '\n');
+  const save = async () => {
+    await fs.mkdir(path.dirname(reportPath), { recursive: true });
+    await fs.writeFile(reportPath, JSON.stringify(report, null, 2) + '\n');
+  };
   try {
     const extension = vscode.extensions.getExtension('saman1001.sedenia');
     assert.ok(extension);
@@ -24,7 +27,7 @@ exports.run = async function () {
       assert.ok(item.iconPath.id);
       if (['busy', 'shell'].includes(row.status)) assert.equal(item.iconPath.id, 'circle-filled');
     }
-    // Overíme oba pracovné stavy aj vtedy, keď práve žiadne živé sedenie nepracuje.
+    // Check both working states even when no live session is currently busy.
     const visualRow = { key: 'visual-test', name: 'Test', cwd: root, folder: 'Test', since: Date.now(), waitingFor: null, entrypoint: 'claude-vscode', isMe: false };
     for (const status of ['busy', 'shell']) {
       assert.equal(api.provider.getTreeItem({ ...visualRow, status }).iconPath.id, 'circle-filled');
@@ -33,14 +36,14 @@ exports.run = async function () {
     report.checks.push('static-working-icons');
     report.rows = api.provider.snapshot.rows.map(({ key, name, folder, status, isMe }) => ({ key, name, folder, status, isMe }));
     if (process.env.SEDENIA_EXPECT_THREAD) {
-      assert.ok(api.provider.snapshot.rows.some(row => row.sessionId === process.env.SEDENIA_EXPECT_THREAD), 'Očakávaný chat musí byť vo výslednom paneli.');
+      assert.ok(api.provider.snapshot.rows.some(row => row.sessionId === process.env.SEDENIA_EXPECT_THREAD), 'The expected chat must be visible in the panel.');
       report.checks.push('expected-thread-visible');
     }
     report.issues = api.provider.snapshot.issues;
     report.checks.push('activation', 'live-read', 'tree-items');
     await vscode.commands.executeCommand('sedenia.sessions.focus');
     await save();
-    // Čas na vizuálnu kontrolu panela. Potom overenie skutočných navigačných volaní.
+    // Optional time for visual inspection before testing navigation.
     await pause(Number(process.env.SEDENIA_VISUAL_WAIT_MS || 0));
     const { openSession } = require('../out/src/extension');
     const before = vscode.workspace.workspaceFolders[0].uri.fsPath;

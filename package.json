@@ -1,18 +1,19 @@
 {
   "name": "sedenia",
   "displayName": "Sedenia",
-  "description": "Prehľad sedení Claude Code a Codexu s prepínaním okien a chatov.",
-  "version": "0.1.2",
+  "description": "A local VS Code sidebar for Claude Code and OpenAI Codex sessions, with waiting states, notifications and window switching on Windows.",
+  "version": "0.1.3",
   "publisher": "saman1001",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "keywords": ["claude-code", "openai-codex", "session-monitor", "ai-agents", "vscode-extension", "windows", "local-first"],
   "repository": { "type": "git", "url": "https://github.com/saman1001/sedenia-vscode.git" },
   "engines": { "vscode": "^1.100.0" },
   "categories": ["Other"],
   "extensionKind": ["ui"],
   "activationEvents": ["onStartupFinished"],
   "main": "./out/src/extension.js",
-  "files": ["out/src/**", "media/**", "README.md"],
+  "files": ["out/src/**", "media/**", "README.md", "LICENSE", "hooks/sedenia_cakanie.py", "hooks/hooks.example.json", "docs/codex-hook.md"],
   "capabilities": { "untrustedWorkspaces": { "supported": true }, "virtualWorkspaces": false },
   "contributes": {
     "viewsContainers": { "activitybar": [{ "id": "sedenia", "title": "Sedenia", "icon": "media/sedenia.svg" }] },
@@ -35,8 +36,9 @@
     "watch": "tsc -p . --watch",
     "test": "npm run build && node --test out/test/*.test.js",
     "test:vscode": "npm run build && node test/run-vscode.cjs",
+    "test:hook": "python -I test/hook_test.py",
     "vscode:prepublish": "npm run build",
-    "package": "vsce package --no-dependencies --allow-missing-repository --skip-license"
+    "package": "vsce package --no-dependencies"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { SessionMonitor } from '../src/monitor'
 import { SessionReader, readRollout } from '../src/readers'
-import { codexDayDirs, parseCodexRollout } from '../src/codex'
+import { codexDayDirs, codexRow, parseCodexRollout } from '../src/codex'
 import { codexApprovalDir, codexSessionsDir, parseSessionRecord, registryDir } from '../src/sessions'
 import { isCurrentWindow, navigationTarget } from '../src/navigation'
 import type { SessionRow } from '../src/types'
@@ -320,4 +320,66 @@ test('čerstvé udalosti v logu so starým nemenným mtime sa čítajú pri šta
   const done = await monitor.poll(NOW + 20_000, [])
   assert.equal(done.rows[0].status, 'idle')
   assert.match(done.notifications[0], /dokončil ťah/)
+})
+
+test('nový formát item_completed otvorí otázku, ponechá ju počas spánku a zavrie po odpovedi', async () => {
+  const f = await fixture()
+  let contents = meta() + event('task_started', NOW)
+  await writeFile(f.thread(), contents)
+  const monitor = new SessionMonitor(() => {}, { profile: f.profile })
+  await monitor.poll(NOW, [])
+  contents += event('item_completed', NOW + 1000, { item: {
+    type: 'AgentMessage', id: 'test-question', phase: 'final_answer', delivery: 'async',
+    content: [{ type: 'Text', text: 'Skúšobná otázka' }], questions: [{ title: 'Vidíš čakanie?' }],
+  } })
+  contents += JSON.stringify({ timestamp: new Date(NOW + 1001).toISOString(), type: 'response_item', payload: {
+    type: 'function_call_output', call_id: 'test-question', output: '{"accepted":true}',
+  } }) + '\n'
+  await writeFile(f.thread(), contents)
+  const waiting = await monitor.poll(NOW + 10_000, [])
+  assert.equal(waiting.rows[0].status, 'waiting')
+  assert.equal(waiting.rows[0].waitingFor, 'otázka')
+  assert.match(waiting.notifications[0], /otázka/)
+  const stillWaiting = await monitor.poll(NOW + 80_000, [])
+  assert.equal(stillWaiting.rows[0].status, 'waiting')
+  assert.deepEqual(stillWaiting.notifications, [])
+  contents += event('item_completed', NOW + 81_000, { item: {
+    type: 'UserMessage', id: 'test-reply', client_id: 'test-client',
+    content: [{ type: 'text', text: 'Áno' }],
+  } })
+  await writeFile(f.thread(), contents)
+  const answered = await monitor.poll(NOW + 90_000, [])
+  assert.equal(answered.rows[0].status, 'busy')
+  assert.equal(answered.rows[0].waitingFor, null)
+  assert.deepEqual(answered.notifications, [])
+})
+
+test('otázky a odpovede sa rozpoznajú aj pri kombinácii starého a nového formátu', () => {
+  const modernQuestion = event('item_completed', NOW + 1000, { item: { type: 'AgentMessage', questions: [{ title: 'Test?' }] } })
+  const legacyQuestion = event('agent_message', NOW + 1000, { questions: [{ title: 'Test?' }] })
+  const modernReply = event('item_completed', NOW + 2000, { item: { type: 'UserMessage', content: [{ type: 'text', text: 'Áno' }] } })
+  const legacyReply = event('user_message', NOW + 2000)
+  for (const [question, reply] of [[modernQuestion, legacyReply], [legacyQuestion, modernReply]]) {
+    const thread = parseCodexRollout(meta() + event('task_started', NOW) + question + reply)
+    assert.ok(thread)
+    assert.equal(thread.lastQuestionAt, NOW + 1000)
+    assert.equal(thread.lastUserMessageAt, NOW + 2000)
+    assert.equal(codexRow(thread, NOW + 3000, null)?.status, 'busy')
+  }
+})
+
+test('začatá položka, prázdne otázky a iné druhy dokončených položiek nevyvolajú čakanie', () => {
+  const variants = [
+    event('item_started', NOW + 1000, { item: { type: 'AgentMessage', questions: [{ title: 'Test?' }] } }),
+    event('item_completed', NOW + 1000, { item: { type: 'AgentMessage', questions: [] } }),
+    event('item_completed', NOW + 1000, { item: { type: 'Reasoning', questions: [{ title: 'Test?' }] } }),
+    event('item_completed', NOW + 1000, { item: null }),
+    event('item_completed', NOW + 1000, { item: 'AgentMessage' }),
+  ]
+  for (const variant of variants) {
+    const thread = parseCodexRollout(meta() + event('task_started', NOW) + variant)
+    assert.ok(thread)
+    assert.equal(thread.lastQuestionAt, null)
+    assert.equal(codexRow(thread, NOW + 2000, null)?.status, 'busy')
+  }
 })

@@ -19,10 +19,12 @@ import type { SessionRow } from './types'
 // pozná mod podľa výstupu nástroja v JSONL.
 //
 // Otázku používateľovi (nástroj request_user_input_async) Codex do JSONL
-// zapisuje sám — `event_msg` `agent_message` s neprázdnym poľom `questions`,
-// hook PermissionRequest sa pri nej nespúšťa. Ťah počas otázky beží (Codex
+// zapisuje sám — `event_msg` `agent_message` alebo `item_completed` s položkou
+// `AgentMessage`, v oboch neprázdne `questions`. Hook PermissionRequest sa
+// pri nej nespúšťa. Ťah počas otázky beží (Codex
 // čaká cez clock.sleep). Odpoveď kliknutím na možnosť aj napísaná správa
-// príde ako `event_msg` `user_message` — otázka bez neskoršej správy je otvorená.
+// príde ako `user_message` alebo `item_completed` s položkou `UserMessage`.
+// Otázka bez neskoršej správy používateľa je otvorená.
 // ---------------------------------------------------------------------------
 
 /** Originator vlákna založeného v rozšírení VS Code. */
@@ -68,9 +70,9 @@ export type CodexThread = {
   turn: { isRunning: boolean; at: number } | null
   /** Timestamp posledného výstupu nástroja (`function_call_output`, `custom_tool_call_output`), inak null. */
   lastOutputAt: number | null
-  /** Timestamp poslednej otázky Codexu (`event_msg` `agent_message` s neprázdnym `questions`), inak null. */
+  /** Timestamp poslednej otázky Codexu (stará správa alebo dokončená položka s `questions`), inak null. */
   lastQuestionAt: number | null
-  /** Timestamp poslednej správy používateľa (`event_msg` `user_message`, aj odpoveď na otázku), inak null. */
+  /** Timestamp poslednej správy používateľa (`user_message` alebo dokončená položka `UserMessage`), inak null. */
   lastUserMessageAt: number | null
   /** Prečítaný len prvý riadok a koniec súboru nad 4 MiB. */
   isTruncated: boolean
@@ -101,10 +103,15 @@ function parseLine(line: string): RolloutLine | null {
   return { at, type: textOf(data.type), payload: isObject(data.payload) ? data.payload : {} }
 }
 
-/** Otázka Codexu používateľovi — payload `agent_message` s neprázdnym poľom `questions`. */
+/** Stará udalosť správy alebo správa vo vnútri novej udalosti item_completed. */
+function messageOf(payload: Record<string, unknown>): Record<string, unknown> {
+  return payload.type === 'item_completed' && isObject(payload.item) ? payload.item : payload
+}
+
+/** Otázka Codexu používateľovi v oboch podporovaných formátoch správy. */
 function isQuestion(payload: Record<string, unknown>): boolean {
   const questions = payload.questions
-  return payload.type === 'agent_message' && Array.isArray(questions) && questions.length > 0
+  return (payload.type === 'agent_message' || payload.type === 'AgentMessage') && Array.isArray(questions) && questions.length > 0
 }
 
 /** Názov priečinka ako `lastSegment` v register.tsx — kópia, aby sa moduly neimportovali navzájom. */
@@ -172,8 +179,11 @@ export function parseCodexRollout(text: string): CodexThread | null {
       continue
     }
     if (item.type === 'response_item' && OUTPUT_TYPES.has(kind)) lastOutputAt = item.at
-    if (item.type === 'event_msg' && isQuestion(item.payload)) lastQuestionAt = item.at
-    if (item.type === 'event_msg' && kind === 'user_message') lastUserMessageAt = item.at
+    if (item.type === 'event_msg') {
+      const message = messageOf(item.payload)
+      if (isQuestion(message)) lastQuestionAt = item.at
+      if (message.type === 'user_message' || message.type === 'UserMessage') lastUserMessageAt = item.at
+    }
   }
 
   return {

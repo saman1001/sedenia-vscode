@@ -27,3 +27,8 @@ out/
 dist/
 tsconfig.tsbuildinfo
 *.vsix
+
+# Local smoke-test reports can contain session identifiers and folder names.
+test-results/
+__pycache__/
+hooks/sedenia-cakanie/
