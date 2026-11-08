@@ -17,7 +17,8 @@ Checklist funkcií projektu — čo je hotové a čo čaká. Bez dátumov (hist�
 
 ## Vlákna Codexu
 
-- [x] Čítanie rollout JSONL za dnešok a včerajšok s cache podľa veľkosti a času zmeny
+- [x] Čítanie rollout JSONL bez obmedzenia dátumom založenia, s cache podľa veľkosti a času zmeny
+- [x] Rastúci log sa sleduje aj pri nemennom čase úpravy, vek aktivity určujú udalosti
 - [x] Čakanie na schválenie z markerov hooku
 - [x] Čakanie na otázku z JSONL
 - [x] Sloty na priečinok a pre desktopovú appku
@@ -27,6 +28,7 @@ Checklist funkcií projektu — čo je hotové a čo čaká. Bez dátumov (hist�
 
 - [x] Ikona v Activity Bar a zoznam v ľavom paneli
 - [x] Ikony a farby stavu, trvanie v popise, cesta v tooltipe
+- [x] Statická modrá bodka pre bežiace sedenie, žltý zvonček pre čakanie
 - [x] Hlavička s počtami a časom posledného čítania
 - [x] Odznak s počtom čakajúcich
 - [x] Značka sedení aktuálneho okna
@@ -59,6 +61,5 @@ Checklist funkcií projektu — čo je hotové a čo čaká. Bez dátumov (hist�
 ## Neskôr
 
 - [ ] Jedno čítanie pre všetky okná namiesto čítania v každom okne
-- [ ] Vlákna Codexu staršie ako dva dni, ak stále bežia
 - [ ] Inkrementálne čítanie JSONL od posledného miesta
 - [ ] Lokálny HTML panel mimo VS Code, ktorý sleduje všetky sedenia a agentov naraz — len sledovanie, riadenie ostáva vo VS Code (nápad, nerozhodnuté)

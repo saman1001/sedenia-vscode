@@ -2,7 +2,7 @@
   "name": "sedenia",
   "displayName": "Sedenia",
   "description": "Prehľad sedení Claude Code a Codexu s prepínaním okien a chatov.",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "publisher": "saman1001",
   "private": true,
   "license": "UNLICENSED",

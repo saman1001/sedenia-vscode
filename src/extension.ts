@@ -22,7 +22,7 @@ export class SessionsProvider implements vscode.TreeDataProvider<SessionRow> {
     item.description = `${row.folder} · ${state}${group === 'idle' ? '' : ` ${age}`}${group === 'waiting' ? reason : ''}${row.isMe ? ' · toto okno' : ''}`
     item.tooltip = `${rowLine(row, this.snapshot.polledAt)}\n${row.cwd}\n${row.entrypoint === 'Codex Desktop' ? 'Otvoriť chat v natívnej appke Codexu' : 'Prepnúť do okna VS Code'}${row.isMe ? '\nToto okno' : ''}`
     item.iconPath = new vscode.ThemeIcon(
-      group === 'waiting' ? 'bell' : group === 'running' ? 'sync~spin' : 'circle-outline',
+      group === 'waiting' ? 'bell' : group === 'running' ? 'circle-filled' : 'circle-outline',
       new vscode.ThemeColor(group === 'waiting' ? 'notificationsWarningIcon.foreground' : group === 'running' ? 'progressBar.background' : 'disabledForeground'),
     )
     item.command = { command: 'sedenia.open', title: 'Otvoriť sedenie', arguments: [row.key] }

@@ -3,7 +3,7 @@ import path from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import {
-  codexDayDirs, isApprovalFile, isRolloutFile, joinRolloutHeadTail,
+  isApprovalFile, isRolloutFile, joinRolloutHeadTail,
   parseApprovalMarker, parseCodexRollout, type ApprovalMarker, type CodexThread,
 } from './codex'
 import { parseSessionRecord, parseTasklistPids } from './sessions'
@@ -23,6 +23,22 @@ function isMissing(error: unknown): boolean {
 async function listFiles(dir: string) {
   try { return await readdir(dir, { withFileTypes: true }) }
   catch (error) { if (isMissing(error)) return null; throw error }
+}
+
+/** Dátum priečinka je dátum založenia, nie poslednej práce na chate. */
+async function listCodexDayDirs(root: string): Promise<string[]> {
+  let dirs = [root]
+  for (const pattern of [/^\d{4}$/, /^(0[1-9]|1[0-2])$/, /^(0[1-9]|[12]\d|3[01])$/]) {
+    const next: string[] = []
+    for (const dir of dirs) {
+      const entries = await listFiles(dir)
+      for (const entry of entries ?? []) {
+        if (entry.isDirectory() && pattern.test(entry.name)) next.push(path.join(dir, entry.name))
+      }
+    }
+    dirs = next
+  }
+  return dirs
 }
 
 /** Číta obmedzený počet bajtov aj z mnohomegabajtových živých JSONL. */
@@ -84,6 +100,7 @@ export class SessionReader {
     const previous = cache.get(file)
     try {
       const info = await stat(file)
+      // Otvorenému logu môže rásť veľkosť bez zmeny mtime. Vek aktivity určujú udalosti.
       if (previous?.size === info.size && previous.mtimeMs === info.mtimeMs) return previous.value
       const value = await parse()
       cache.set(file, { size: info.size, mtimeMs: info.mtimeMs, value })
@@ -97,7 +114,7 @@ export class SessionReader {
   async readCodexThreads(root: string, now: number): Promise<CodexThread[]> {
     const seen = new Set<string>()
     const threads: CodexThread[] = []
-    for (const dir of codexDayDirs(root, now)) {
+    for (const dir of await listCodexDayDirs(root)) {
       const entries = await listFiles(dir)
       for (const entry of entries ?? []) {
         if (!entry.isFile() || !isRolloutFile(entry.name)) continue

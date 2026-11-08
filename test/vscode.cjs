@@ -22,8 +22,20 @@ exports.run = async function () {
       assert.equal(item.id, row.key);
       assert.equal(item.command.command, 'sedenia.open');
       assert.ok(item.iconPath.id);
+      if (['busy', 'shell'].includes(row.status)) assert.equal(item.iconPath.id, 'circle-filled');
     }
+    // Overíme oba pracovné stavy aj vtedy, keď práve žiadne živé sedenie nepracuje.
+    const visualRow = { key: 'visual-test', name: 'Test', cwd: root, folder: 'Test', since: Date.now(), waitingFor: null, entrypoint: 'claude-vscode', isMe: false };
+    for (const status of ['busy', 'shell']) {
+      assert.equal(api.provider.getTreeItem({ ...visualRow, status }).iconPath.id, 'circle-filled');
+    }
+    assert.equal(api.provider.getTreeItem({ ...visualRow, status: 'waiting' }).iconPath.id, 'bell');
+    report.checks.push('static-working-icons');
     report.rows = api.provider.snapshot.rows.map(({ key, name, folder, status, isMe }) => ({ key, name, folder, status, isMe }));
+    if (process.env.SEDENIA_EXPECT_THREAD) {
+      assert.ok(api.provider.snapshot.rows.some(row => row.sessionId === process.env.SEDENIA_EXPECT_THREAD), 'Očakávaný chat musí byť vo výslednom paneli.');
+      report.checks.push('expected-thread-visible');
+    }
     report.issues = api.provider.snapshot.issues;
     report.checks.push('activation', 'live-read', 'tree-items');
     await vscode.commands.executeCommand('sedenia.sessions.focus');

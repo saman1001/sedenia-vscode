@@ -19,8 +19,8 @@ function row(fields: Partial<SessionRow> = {}): SessionRow {
 function event(type: string, at: number, extra: object = {}): string {
   return JSON.stringify({ type: 'event_msg', timestamp: new Date(at).toISOString(), payload: { type, ...extra } }) + '\n'
 }
-function meta(id = 'thread-a', originator = 'Codex Desktop'): string {
-  return JSON.stringify({ type: 'session_meta', timestamp: new Date(NOW - 1000).toISOString(), payload: { id, cwd: folder, originator } }) + '\n'
+function meta(id = 'thread-a', originator = 'Codex Desktop', startedAt = NOW - 1000): string {
+  return JSON.stringify({ type: 'session_meta', timestamp: new Date(startedAt).toISOString(), payload: { id, cwd: folder, originator } }) + '\n'
 }
 async function fixture() {
   const profile = await mkdtemp(path.join(tmpdir(), 'sedenia-test-'))
@@ -199,4 +199,125 @@ test('Codex upozorní aj za dokončený chat skrytý limitom a potlačí vlastn�
   await own.poll(NOW, [folder])
   await writeFile(f.thread('c'), meta('c', 'codex_vscode') + event('task_complete', NOW + 5000))
   assert.deepEqual((await own.poll(NOW + 10_000, [folder])).notifications, [])
+})
+
+test('aktívny chat zo starého roka a mesiaca sa načíta už pri štarte panela', async () => {
+  const f = await fixture()
+  const oldDir = path.join(codexSessionsDir(f.profile), '2024', '12', '31')
+  await mkdir(oldDir, { recursive: true })
+  await writeFile(path.join(oldDir, 'rollout-old.jsonl'), meta('old', 'Codex Desktop', new Date(2024, 11, 31).getTime()) + event('task_started', NOW))
+  const snapshot = await new SessionMonitor(() => {}, { profile: f.profile }).poll(NOW, [])
+  assert.equal(snapshot.rows.length, 1)
+  assert.equal(snapshot.rows[0].sessionId, 'old')
+  assert.equal(snapshot.rows[0].status, 'busy')
+  assert.deepEqual(snapshot.notifications, [])
+})
+
+test('pokračovanie v dávno nečinnom chate sa objaví pri najbližšom čítaní', async () => {
+  const f = await fixture()
+  const oldDir = path.join(codexSessionsDir(f.profile), '2024', '12', '31')
+  await mkdir(oldDir, { recursive: true })
+  const file = path.join(oldDir, 'rollout-resumed.jsonl')
+  const longAgo = NOW - 30 * 24 * 60 * 60_000
+  let contents = meta('resumed', 'Codex Desktop', longAgo) + event('task_complete', longAgo)
+  await writeFile(file, contents)
+  await utimes(file, new Date(longAgo), new Date(longAgo))
+  const monitor = new SessionMonitor(() => {}, { profile: f.profile })
+  assert.equal((await monitor.poll(NOW, [])).rows.length, 0)
+  contents += event('task_started', NOW + 1000)
+  await writeFile(file, contents)
+  await utimes(file, new Date(NOW + 1000), new Date(NOW + 1000))
+  const resumed = await monitor.poll(NOW + 10_000, [])
+  assert.equal(resumed.rows[0].sessionId, 'resumed')
+  assert.equal(resumed.rows[0].status, 'busy')
+})
+
+test('starý chat rozpozná schválenie, otázku aj dokončenie', async () => {
+  const f = await fixture()
+  const oldDir = path.join(codexSessionsDir(f.profile), '2024', '12', '31')
+  await mkdir(oldDir, { recursive: true })
+  const file = path.join(oldDir, 'rollout-waiting.jsonl')
+  let contents = meta('old-waiting') + event('task_started', NOW) + event('agent_message', NOW + 1000, { questions: [{ title: 'Pokračovať?' }] })
+  await writeFile(file, contents)
+  await f.marker('old-waiting', NOW + 2000)
+  const monitor = new SessionMonitor(() => {}, { profile: f.profile })
+  assert.equal((await monitor.poll(NOW + 3000, [])).rows[0].waitingFor, 'schválenie')
+  contents += JSON.stringify({ type: 'response_item', timestamp: new Date(NOW + 4000).toISOString(), payload: { type: 'custom_tool_call_output' } }) + '\n'
+  await writeFile(file, contents)
+  assert.equal((await monitor.poll(NOW + 13_000, [])).rows[0].waitingFor, 'otázka')
+  contents += event('user_message', NOW + 14_000) + event('task_complete', NOW + 15_000)
+  await writeFile(file, contents)
+  const done = await monitor.poll(NOW + 23_000, [])
+  assert.equal(done.rows[0].status, 'idle')
+  assert.match(done.notifications[0], /dokončil ťah/)
+})
+
+test('aktívny chat pri prechode cez polnoc nezmizne z dátumového výberu', async () => {
+  const f = await fixture()
+  const midnight = new Date(new Date(NOW).getFullYear(), new Date(NOW).getMonth(), new Date(NOW).getDate()).getTime()
+  const oldDir = codexDayDirs(codexSessionsDir(f.profile), midnight - 24 * 60 * 60_000)[1]
+  await mkdir(oldDir, { recursive: true })
+  const file = path.join(oldDir, 'rollout-midnight.jsonl')
+  await writeFile(file, meta('midnight') + event('task_started', midnight - 60_000))
+  await utimes(file, new Date(midnight - 60_000), new Date(midnight - 60_000))
+  const monitor = new SessionMonitor(() => {}, { profile: f.profile })
+  assert.equal((await monitor.poll(midnight - 30_000, [])).rows[0].status, 'busy')
+  assert.equal((await monitor.poll(midnight + 30_000, [])).rows[0].status, 'busy')
+})
+
+test('dávne udalosti sa nezobrazujú a nedátumové priečinky ani komprimované súbory sa neprehľadávajú', async () => {
+  const f = await fixture()
+  const errors: string[] = []
+  const oldDir = path.join(codexSessionsDir(f.profile), '2024', '12', '31')
+  await mkdir(oldDir, { recursive: true })
+  const file = path.join(oldDir, 'rollout-cold.jsonl')
+  const longAgo = NOW - 4 * 60 * 60_000
+  await writeFile(file, meta('cold', 'Codex Desktop', longAgo) + event('task_complete', longAgo))
+  await utimes(file, new Date(NOW - 4 * 60 * 60_000), new Date(NOW - 4 * 60 * 60_000))
+  const unrelated = path.join(codexSessionsDir(f.profile), 'backup', '12', '31')
+  await mkdir(unrelated, { recursive: true })
+  await writeFile(path.join(unrelated, 'rollout-unrelated.jsonl'), 'Neplatný JSON.')
+  await writeFile(path.join(oldDir, 'rollout-archived.jsonl.zst'), 'Neplatný JSON.')
+  const monitor = new SessionMonitor(message => errors.push(message), { profile: f.profile })
+  assert.deepEqual((await monitor.poll(NOW, [])).rows, [])
+  assert.deepEqual(errors, [])
+})
+
+test('chat po 3 h bez udalosti zmizne z panela a po obnovení sa vráti', async () => {
+  const f = await fixture()
+  const file = f.thread()
+  await writeFile(file, meta() + event('task_complete', NOW))
+  await utimes(file, new Date(NOW), new Date(NOW))
+  const monitor = new SessionMonitor(() => {}, { profile: f.profile })
+  assert.equal((await monitor.poll(NOW, [])).rows.length, 1)
+  const later = NOW + 3 * 60 * 60_000 + 1000
+  assert.deepEqual((await monitor.poll(later, [])).rows, [])
+  await writeFile(file, meta() + event('task_started', later))
+  await utimes(file, new Date(later), new Date(later))
+  assert.equal((await monitor.poll(later + 10_000, [])).rows[0].status, 'busy')
+})
+
+test('čerstvé udalosti v logu so starým nemenným mtime sa čítajú pri štarte aj po zväčšení', async () => {
+  const f = await fixture()
+  const oldDir = path.join(codexSessionsDir(f.profile), '2024', '12', '31')
+  await mkdir(oldDir, { recursive: true })
+  const file = path.join(oldDir, 'rollout-open-handle.jsonl')
+  const oldMtime = new Date(NOW - 24 * 60 * 60_000)
+  let contents = meta('open-handle', 'Codex Desktop', oldMtime.getTime()) + event('task_started', NOW)
+  await writeFile(file, contents)
+  await utimes(file, oldMtime, oldMtime)
+  const monitor = new SessionMonitor(() => {}, { profile: f.profile })
+  const active = await monitor.poll(NOW, [])
+  assert.equal(active.rows[0].sessionId, 'open-handle')
+  assert.equal(active.rows[0].status, 'busy')
+  contents += event('agent_message', NOW + 1000, { questions: [{ title: 'Potvrď krok' }] })
+  await writeFile(file, contents)
+  await utimes(file, oldMtime, oldMtime)
+  assert.equal((await monitor.poll(NOW + 10_000, [])).rows[0].waitingFor, 'otázka')
+  contents += event('task_complete', NOW + 11_000)
+  await writeFile(file, contents)
+  await utimes(file, oldMtime, oldMtime)
+  const done = await monitor.poll(NOW + 20_000, [])
+  assert.equal(done.rows[0].status, 'idle')
+  assert.match(done.notifications[0], /dokončil ťah/)
 })
